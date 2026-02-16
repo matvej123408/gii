@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Табло автобусов — Gießen</title>
+  <style>
+    body {
+      margin: 0;
+      background: #000;
+      color: #00ff9c;
+      font-family: monospace;
+      padding: 16px;
+    }
+    h1 {
+      margin: 0 0 12px;
+      text-align: center;
+      font-size: 22px;
+    }
+    .row {
+      display: grid;
+      grid-template-columns: 70px 1fr 90px;
+      gap: 8px;
+      padding: 10px 0;
+      border-bottom: 1px solid #033;
+      font-size: 20px;
+    }
+    .time {
+      text-align: right;
+      font-weight: bold;
+    }
+    .status {
+      text-align: center;
+      opacity: 0.7;
+      margin-top: 10px;
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+  <h1>🚌 Gießen — Остановка “Marktplatz”</h1>
+  <div id="board">Загрузка табло…</div>
+  <div class="status" id="status">Обновление каждые 30 секунд</div>
+
+  <script>
+    // 🔑 ВСТАВЬ СЮДА СВОЙ accessId от RMV
+    const API_KEY = "1775f9f1-32b8-48ad-98c8-06b2f6276fa0";
+
+    // 🧱 Бесплатный CORS-прокси, чтобы работало локально (file://)
+    const PROXY = "https://cors.isomorphic-git.org/";
+
+    // 📍 ID фиксированной остановки (Gießen Marktplatz)
+    const STOP_ID = "3019188"; // если не работает — скажи, подберу другой ID
+
+    const board = document.getElementById("board");
+    const status = document.getElementById("status");
+
+    function minutesFromNow(timeStr) {
+      if (!timeStr) return "—";
+      const [h, m] = timeStr.split(":").map(Number);
+      const now = new Date();
+      const t = new Date(now);
+      t.setHours(h, m, 0, 0);
+      let min = Math.round((t - now) / 60000);
+      if (min < 0) min += 24 * 60;
+      return min > 0 ? min + " мин" : "сейчас";
+    }
+
+    async function loadBoard() {
+      try {
+        status.textContent = "Обновление…";
+        const url = PROXY + `https://www.rmv.de/hapi/departureBoard?accessId=${API_KEY}&id=${STOP_ID}&format=json&maxJourneys=8`;
+        const res = await fetch(url);
+        const data = await res.json();
+        const list = data.Departure || [];
+
+        if (!list.length) {
+          board.textContent = "Нет отправлений в ближайшее время";
+          status.textContent = "Последнее обновление: " + new Date().toLocaleTimeString();
+          return;
+        }
+
+        board.innerHTML = list.map(d => `
+          <div class="row">
+            <div>🚌 ${d.line}</div>
+            <div>${d.direction || ""}</div>
+            <div class="time">${minutesFromNow(d.rtTime || d.time)}</div>
+          </div>
+        `).join("");
+
+        status.textContent = "Последнее обновление: " + new Date().toLocaleTimeString();
+      } catch (e) {
+        console.error(e);
+        board.textContent = "Ошибка загрузки табло";
+        status.textContent = "Проверь API-ключ или интернет";
+      }
+    }
+
+    loadBoard();
+    setInterval(loadBoard, 30000);
+  </script>
+</body>
+</html>
